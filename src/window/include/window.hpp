@@ -11,6 +11,11 @@ enum class Api {
     XCB,
 };
 
+struct WindowSize {
+    int width = 0;
+    int height = 0;
+};
+
 struct WindowOptions {
     const char* displayName = nullptr;
     int x = 0;

@@ -47,7 +47,7 @@ private:
     template <Streamable T>
     void append(const T& x)
     {
-        auto stream = std::ostringstream{_message};
+        auto stream = std::ostringstream{_message, std::ios::ate};
         stream << x;
         _message = stream.str();
     }

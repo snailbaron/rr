@@ -1,0 +1,5 @@
+#pragma once
+
+#include <filesystem>
+
+inline const std::filesystem::path SHADER_DIR = "@SHADER_DIR@";

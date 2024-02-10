@@ -2,6 +2,7 @@
 
 #include <vk/check.hpp>
 #include <vk/global.hpp>
+#include <vk/util.hpp>
 
 #include <error.hpp>
 
@@ -30,10 +31,8 @@ VkDebugUtilsMessengerEXT Instance::createDebugUtilsMessengerEXT(
     const VkDebugUtilsMessengerCreateInfoEXT* createInfo,
     const VkAllocationCallbacks* allocator) const
 {
-    auto messenger = VkDebugUtilsMessengerEXT{};
-    check <<vkCreateDebugUtilsMessengerEXT(
-        _instance, createInfo, allocator, &messenger);
-    return messenger;
+    return getVkObject<VkDebugUtilsMessengerEXT>(
+        vkCreateDebugUtilsMessengerEXT, _instance, createInfo, allocator);
 }
 
 void Instance::destroyDebugUtilsMessengerEXT(
@@ -45,55 +44,36 @@ void Instance::destroyDebugUtilsMessengerEXT(
 
 std::vector<VkPhysicalDevice> Instance::enumeratePhysicalDevices() const
 {
-    uint32_t physicalDeviceCount = 0;
-    check << vkEnumeratePhysicalDevices(
-        _instance, &physicalDeviceCount, nullptr);
-    auto physicalDevices = std::vector<VkPhysicalDevice>(physicalDeviceCount);
-    check << vkEnumeratePhysicalDevices(
-        _instance, &physicalDeviceCount, physicalDevices.data());
-    return physicalDevices;
+    return getVkObjects<VkPhysicalDevice>(
+        vkEnumeratePhysicalDevices, _instance);
 }
 
 VkPhysicalDeviceProperties Instance::getPhysicalDeviceProperties(
     VkPhysicalDevice physicalDevice) const
 {
-    auto properties = VkPhysicalDeviceProperties{};
-    vkGetPhysicalDeviceProperties(physicalDevice, &properties);
-    return properties;
+    return getVkObject<VkPhysicalDeviceProperties>(
+        vkGetPhysicalDeviceProperties, physicalDevice);
 }
 
 VkPhysicalDeviceFeatures Instance::getPhysicalDeviceFeatures(
     VkPhysicalDevice physicalDevice) const
 {
-    auto features = VkPhysicalDeviceFeatures{};
-    vkGetPhysicalDeviceFeatures(physicalDevice, &features);
-    return features;
+    return getVkObject<VkPhysicalDeviceFeatures>(
+        vkGetPhysicalDeviceFeatures, physicalDevice);
 }
 
 std::vector<VkExtensionProperties> Instance::enumerateDeviceExtensionProperties(
     VkPhysicalDevice physicalDevice, const char* layerName) const
 {
-    uint32_t extensionCount = 0;
-    check << vkEnumerateDeviceExtensionProperties(
-        physicalDevice, layerName, &extensionCount, nullptr);
-    auto extensionProperties =
-        std::vector<VkExtensionProperties>(extensionCount);
-    check << vkEnumerateDeviceExtensionProperties(
-        physicalDevice, layerName, &extensionCount, extensionProperties.data());
-    return extensionProperties;
+    return getVkObjects<VkExtensionProperties>(
+        vkEnumerateDeviceExtensionProperties, physicalDevice, layerName);
 }
 
 std::vector<VkQueueFamilyProperties> Instance::getPhysicalDeviceQueueFamilyProperties(
     VkPhysicalDevice physicalDevice) const
 {
-    uint32_t queueFamilyCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(
-        physicalDevice, &queueFamilyCount, nullptr);
-    auto queueFamilyProperties =
-        std::vector<VkQueueFamilyProperties>(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(
-        physicalDevice, &queueFamilyCount, queueFamilyProperties.data());
-    return queueFamilyProperties;
+    return getVkObjects<VkQueueFamilyProperties>(
+        vkGetPhysicalDeviceQueueFamilyProperties, physicalDevice);
 }
 
 VkBool32 Instance::getPhysicalDeviceSurfaceSupportKHR(
@@ -101,19 +81,32 @@ VkBool32 Instance::getPhysicalDeviceSurfaceSupportKHR(
     uint32_t queueFamilyIndex,
     VkSurfaceKHR surface) const
 {
-    auto result = VkBool32{};
-    check << vkGetPhysicalDeviceSurfaceSupportKHR(
-        physicalDevice, queueFamilyIndex, surface, &result);
-    return result;
+    return getVkObject<VkBool32>(
+        vkGetPhysicalDeviceSurfaceSupportKHR,
+        physicalDevice,
+        queueFamilyIndex,
+        surface);
 }
 
-VkSurfaceCapabilitiesKHR Instance::getPhysicalDeviceSurfaceCapabilities(
+VkSurfaceCapabilitiesKHR Instance::getPhysicalDeviceSurfaceCapabilitiesKHR(
     VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) const
 {
-    auto capabilities = VkSurfaceCapabilitiesKHR{};
-    check << vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-        physicalDevice, surface, &capabilities);
-    return capabilities;
+    return getVkObject<VkSurfaceCapabilitiesKHR>(
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR, physicalDevice, surface);
+}
+
+std::vector<VkSurfaceFormatKHR> Instance::getPhysicalDeviceSurfaceFormatsKHR(
+    VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) const
+{
+    return getVkObjects<VkSurfaceFormatKHR>(
+        vkGetPhysicalDeviceSurfaceFormatsKHR, physicalDevice, surface);
+}
+
+std::vector<VkPresentModeKHR> Instance::getPhysicalDeviceSurfacePresentModesKHR(
+    VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) const
+{
+    return getVkObjects<VkPresentModeKHR>(
+        vkGetPhysicalDeviceSurfacePresentModesKHR, physicalDevice, surface);
 }
 
 Device Instance::createDevice(
@@ -121,8 +114,8 @@ Device Instance::createDevice(
     const VkDeviceCreateInfo* createInfo,
     const VkAllocationCallbacks* allocator) const
 {
-    auto vkDevice = VkDevice{};
-    check << vkCreateDevice(physicalDevice, createInfo, allocator, &vkDevice);
+    auto vkDevice = getVkObject<VkDevice>(
+        vkCreateDevice, physicalDevice, createInfo, allocator);
     return Device{vkDevice, vkGetDeviceProcAddr};
 }
 
@@ -130,9 +123,8 @@ VkSurfaceKHR Instance::createXcbSurfaceKHR(
     const VkXcbSurfaceCreateInfoKHR* createInfo,
     const VkAllocationCallbacks* allocator) const
 {
-    auto surface = VkSurfaceKHR{};
-    check << vkCreateXcbSurfaceKHR(_instance, createInfo, allocator, &surface);
-    return surface;
+    return getVkObject<VkSurfaceKHR>(
+        vkCreateXcbSurfaceKHR, _instance, createInfo, allocator);
 }
 
 void Instance::destroySurfaceKHR(

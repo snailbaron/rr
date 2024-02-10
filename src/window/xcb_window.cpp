@@ -136,6 +136,13 @@ xcb_window_t XcbWindow::window() const
     return _window;
 }
 
+WindowSize XcbWindow::size() const
+{
+    auto cookie = xcb_get_geometry(_connection.ptr(), _window);
+    auto* reply = xcb_get_geometry_reply(_connection.ptr(), cookie, nullptr);
+    return {.width = reply->width, .height = reply->height};
+}
+
 std::optional<ev::Event> XcbWindow::poll() const
 {
     xcb_generic_event_t* e = xcb_poll_for_event(_connection.ptr());

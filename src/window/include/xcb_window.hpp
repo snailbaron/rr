@@ -32,6 +32,8 @@ public:
     xcb_connection_t* connection() const;
     xcb_window_t window() const;
 
+    WindowSize size() const;
+
     virtual std::optional<ev::Event> poll() const override;
 
 private:

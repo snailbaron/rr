@@ -1,6 +1,7 @@
 #include <vk/device.hpp>
 
 #include <vk/check.hpp>
+#include <vk/util.hpp>
 
 #include <error.hpp>
 
@@ -27,9 +28,88 @@ Device::~Device()
 VkQueue Device::getDeviceQueue(
     uint32_t queueFamilyIndex, uint32_t queueIndex) const
 {
-    auto queue = VkQueue{};
-    vkGetDeviceQueue(_device, queueFamilyIndex, queueIndex, &queue);
-    return queue;
+    return getVkObject<VkQueue>(
+        vkGetDeviceQueue, _device, queueFamilyIndex, queueIndex);
+}
+
+VkSwapchainKHR Device::createSwapchainKHR(
+    const VkSwapchainCreateInfoKHR* createInfo,
+    const VkAllocationCallbacks* allocator) const
+{
+    return getVkObject<VkSwapchainKHR>(
+        vkCreateSwapchainKHR, _device, createInfo, allocator);
+}
+
+void Device::destroySwapchainKHR(
+    VkSwapchainKHR swapchain, const VkAllocationCallbacks* allocator) const
+{
+    vkDestroySwapchainKHR(_device, swapchain, allocator);
+}
+
+std::vector<VkImage> Device::getSwapchainImagesKHR(
+    VkSwapchainKHR swapchain) const
+{
+    return getVkObjects<VkImage>(
+        vkGetSwapchainImagesKHR, _device, swapchain);
+}
+
+VkImageView Device::createImageView(
+    const VkImageViewCreateInfo* createInfo,
+    const VkAllocationCallbacks* allocator) const
+{
+    return getVkObject<VkImageView>(
+        vkCreateImageView, _device, createInfo, allocator);
+}
+
+void Device::destroyImageView(
+    VkImageView imageView, const VkAllocationCallbacks* allocator) const
+{
+    vkDestroyImageView(_device, imageView, allocator);
+}
+
+VkShaderModule Device::createShaderModule(
+    const VkShaderModuleCreateInfo* createInfo,
+    const VkAllocationCallbacks* allocator) const
+{
+    return getVkObject<VkShaderModule>(
+        vkCreateShaderModule, _device, createInfo, allocator);
+}
+
+void Device::destroyShaderModule(
+    VkShaderModule shaderModule,
+    const VkAllocationCallbacks* allocator) const
+{
+    vkDestroyShaderModule(_device, shaderModule, allocator);
+}
+
+VkPipelineLayout Device::createPipelineLayout(
+    const VkPipelineLayoutCreateInfo* createInfo,
+    const VkAllocationCallbacks* allocator) const
+{
+    return getVkObject<VkPipelineLayout>(
+        vkCreatePipelineLayout, _device, createInfo, allocator);
+}
+
+void Device::destroyPipelineLayout(
+    VkPipelineLayout pipelineLayout,
+    const VkAllocationCallbacks* allocator) const
+{
+    vkDestroyPipelineLayout(_device, pipelineLayout, allocator);
+}
+
+VkRenderPass Device::createRenderPass(
+    const VkRenderPassCreateInfo* createInfo,
+    const VkAllocationCallbacks* allocator) const
+{
+    return getVkObject<VkRenderPass>(
+        vkCreateRenderPass, _device, createInfo, allocator);
+}
+
+void Device::destroyRenderPass(
+    VkRenderPass renderPass,
+    const VkAllocationCallbacks* allocator) const
+{
+    vkDestroyRenderPass(_device, renderPass, allocator);
 }
 
 std::vector<VkPipeline> Device::createGraphicsPipelines(
@@ -47,6 +127,12 @@ std::vector<VkPipeline> Device::createGraphicsPipelines(
         allocator,
         pipelines.data());
     return pipelines;
+}
+
+void Device::destroyPipeline(
+    VkPipeline pipeline, const VkAllocationCallbacks* allocator) const
+{
+    vkDestroyPipeline(_device, pipeline, allocator);
 }
 
 } // namespace rr::vk

@@ -40,7 +40,11 @@ public:
         VkPhysicalDevice physicalDevice,
         uint32_t queueFamilyIndex,
         VkSurfaceKHR surface) const;
-    VkSurfaceCapabilitiesKHR getPhysicalDeviceSurfaceCapabilities(
+    VkSurfaceCapabilitiesKHR getPhysicalDeviceSurfaceCapabilitiesKHR(
+        VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) const;
+    std::vector<VkSurfaceFormatKHR> getPhysicalDeviceSurfaceFormatsKHR(
+        VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) const;
+    std::vector<VkPresentModeKHR> getPhysicalDeviceSurfacePresentModesKHR(
         VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) const;
 
     Device createDevice(
