@@ -311,9 +311,9 @@ int main()
         swapChainImageCount = availableSurfaceCapabilities.minImageCount + 1;
     }
 
-    [[maybe_unused]] VkQueue graphicsQueue =
+    VkQueue graphicsQueue =
         device.getDeviceQueue(selectedGraphicsQueueFamily, 0);
-    [[maybe_unused]] VkQueue presentQueue =
+    VkQueue presentQueue =
         device.getDeviceQueue(selectedPresentQueueFamily, 0);
 
     auto swapchainExtent = VkExtent2D{
@@ -572,6 +572,15 @@ int main()
         .pPreserveAttachments = nullptr,
     };
 
+    auto subpassDependency = VkSubpassDependency{
+        .srcSubpass = VK_SUBPASS_EXTERNAL,
+        .dstSubpass = 0,
+        .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        .srcAccessMask = 0,
+        .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        .dependencyFlags = {},
+    };
     auto renderPassInfo = VkRenderPassCreateInfo{
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
         .pNext = nullptr,
@@ -580,8 +589,8 @@ int main()
         .pAttachments = &colorAttachmentDescription,
         .subpassCount = 1,
         .pSubpasses = &subpassDescription,
-        .dependencyCount = 0,
-        .pDependencies = nullptr,
+        .dependencyCount = 1,
+        .pDependencies = &subpassDependency,
     };
     VkRenderPass renderPass = device.createRenderPass(&renderPassInfo, nullptr);
 
@@ -609,14 +618,184 @@ int main()
 
     std::vector<VkPipeline> pipelines = device.createGraphicsPipelines(
         VK_NULL_HANDLE, 1, &pipelineInfo, nullptr);
-    VkPipeline pipeline = pipelines.front();
+    VkPipeline graphicsPipeline = pipelines.front();
+
+    auto swapchainFramebuffers = std::vector<VkFramebuffer>{};
+    swapchainFramebuffers.reserve(swapchainImageViews.size());
+    for (const auto& swapchainImageView : swapchainImageViews) {
+        auto framebufferInfo = VkFramebufferCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .renderPass = renderPass,
+            .attachmentCount = 1,
+            .pAttachments = &swapchainImageView,
+            .width = swapchainExtent.width,
+            .height = swapchainExtent.height,
+            .layers = 1,
+        };
+        swapchainFramebuffers.push_back(
+            device.createFramebuffer(&framebufferInfo, nullptr));
+    }
+
+    auto commandPoolInfo = VkCommandPoolCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+        .queueFamilyIndex = selectedGraphicsQueueFamily,
+    };
+    VkCommandPool commandPool =
+        device.createCommandPool(&commandPoolInfo, nullptr);
+
+    auto commandBufferInfo = VkCommandBufferAllocateInfo{
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .pNext = nullptr,
+        .commandPool = commandPool,
+        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        .commandBufferCount = 1,
+    };
+    auto commandBuffers = device.allocateCommandBuffers(&commandBufferInfo);
+    VkCommandBuffer commandBuffer = commandBuffers.front();
+
+
+    auto semaphoreInfo = VkSemaphoreCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+    };
+    VkSemaphore imageAvailableSemaphore =
+        device.createSemaphore(&semaphoreInfo, nullptr);
+    VkSemaphore renderFinishedSemaphore =
+        device.createSemaphore(&semaphoreInfo, nullptr);
+
+    auto fenceInfo = VkFenceCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = VK_FENCE_CREATE_SIGNALED_BIT,
+    };
+    VkFence inFlightFence = device.createFence(&fenceInfo, nullptr);
+
+    for (;;) {
+        bool done = false;
+        while (auto e = window.poll()) {
+            if (e->closeWindow()) {
+                done = true;
+                break;
+            }
+        }
+        if (done) {
+            break;
+        }
+
+        device.waitForFences(1, &inFlightFence, VK_TRUE, UINT64_MAX);
+        device.resetFences(1, &inFlightFence);
+
+        uint32_t imageIndex = device.acquireNextImageKHR(
+            swapchain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE);
+
+        device.resetCommandBuffer(commandBuffer, 0);
+
+        auto beginInfo = VkCommandBufferBeginInfo{
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .pInheritanceInfo = nullptr,
+        };
+        device.beginCommandBuffer(commandBuffer, &beginInfo);
+
+        VkFramebuffer framebuffer = swapchainFramebuffers.at(imageIndex);
+
+        auto clearColor = VkClearValue{
+            .color = {{0.f, 0.f, 0.f, 1.f}}
+        };
+        auto renderPassBeginInfo = VkRenderPassBeginInfo{
+            .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+            .pNext = nullptr,
+            .renderPass = renderPass,
+            .framebuffer = framebuffer,
+            .renderArea = VkRect2D{
+                .offset = VkOffset2D{.x = 0, .y = 0},
+                .extent = swapchainExtent,
+            },
+            .clearValueCount = 1,
+            .pClearValues = &clearColor,
+        };
+        device.cmdBeginRenderPass(
+            commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        device.cmdBindPipeline(
+            commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+        auto vp = VkViewport{
+            .x = 0.f,
+            .y = 0.f,
+            .width = (float)swapchainExtent.width,
+            .height = (float)swapchainExtent.height,
+            .minDepth = 0.f,
+            .maxDepth = 1.f,
+        };
+        device.cmdSetViewport(commandBuffer, 0, 1, &vp);
+
+        auto sc = VkRect2D{
+            .offset = {0, 0},
+            .extent = swapchainExtent,
+        };
+        device.cmdSetScissor(commandBuffer, 0, 1, &sc);
+
+        device.cmdDraw(commandBuffer, 3, 1, 0, 0);
+
+        device.cmdEndRenderPass(commandBuffer);
+
+        device.endCommandBuffer(commandBuffer);
+
+        VkPipelineStageFlags waitStages[] {
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        };
+        auto submitInfo = VkSubmitInfo{
+            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .pNext = nullptr,
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = &imageAvailableSemaphore,
+            .pWaitDstStageMask = waitStages,
+            .commandBufferCount = 1,
+            .pCommandBuffers = &commandBuffer,
+            .signalSemaphoreCount = 1,
+            .pSignalSemaphores = &renderFinishedSemaphore,
+        };
+        device.queueSubmit(graphicsQueue, 1, &submitInfo, inFlightFence);
+
+        auto presentInfo = VkPresentInfoKHR{
+            .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+            .pNext = nullptr,
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = &renderFinishedSemaphore,
+            .swapchainCount = 1,
+            .pSwapchains = &swapchain,
+            .pImageIndices = &imageIndex,
+            .pResults = nullptr,
+        };
+        device.queuePresentKHR(presentQueue, &presentInfo);
+
+
+        //std::this_thread::sleep_for(1.0s / 30);
+    }
+
+    device.waitIdle();
 
 
 
 
+    device.destroySemaphore(imageAvailableSemaphore, nullptr);
+    device.destroySemaphore(renderFinishedSemaphore, nullptr);
+    device.destroyFence(inFlightFence, nullptr);
 
+    device.destroyCommandPool(commandPool, nullptr);
 
-    device.destroyPipeline(pipeline, nullptr);
+    for (auto framebuffer : swapchainFramebuffers) {
+        device.destroyFramebuffer(framebuffer, nullptr);
+    }
+
+    device.destroyPipeline(graphicsPipeline, nullptr);
 
     device.destroyRenderPass(renderPass, nullptr);
     device.destroyPipelineLayout(pipelineLayout, nullptr);
@@ -631,22 +810,4 @@ int main()
 
     instance.destroyDebugUtilsMessengerEXT(debugMessenger, nullptr);
     instance.destroySurfaceKHR(surface, nullptr);
-
-
-
-    //for (;;) {
-    //    bool done = false;
-    //    while (auto e = window->poll()) {
-    //        if (e->closeWindow()) {
-    //            done = true;
-    //            break;
-    //        }
-    //    }
-    //    if (done) {
-    //        break;
-    //    }
-
-    //    std::this_thread::sleep_for(1.0s / 30);
-    //}
-
 }
