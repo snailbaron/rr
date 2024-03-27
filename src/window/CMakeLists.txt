@@ -1,6 +1,10 @@
 add_library(window
     window.cpp
-    xcb_window.cpp
-)
+ "windows_window.cpp")
 target_include_directories(window PUBLIC include)
-target_link_libraries(window PRIVATE error X11::xcb)
+target_link_libraries(window PRIVATE error)
+
+if(UNIX)
+    target_sources(window xcb_window.cpp)
+    target_link_libraries(window PRIVATE X11::xcb)
+endif()

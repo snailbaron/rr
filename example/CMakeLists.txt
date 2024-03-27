@@ -25,4 +25,8 @@ add_executable(example
 )
 target_include_directories(example PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
 target_link_libraries(example PRIVATE
-    error mm window vk Vulkan::Headers)
+    error li mm window Vulkan::Headers)
+target_compile_definitions(example PRIVATE
+    VULKAN_HPP_NO_CONSTRUCTORS
+    VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1
+)

@@ -8,7 +8,11 @@
 namespace rr {
 
 enum class Api {
+#if defined(__linux)
     XCB,
+#elif defined(_WIN32)
+    Win32
+#endif
 };
 
 struct WindowSize {
@@ -27,11 +31,13 @@ struct WindowOptions {
 
 class Window {
 public:
+
     static std::unique_ptr<Window> create(Api api, const WindowOptions& options);
 
     virtual ~Window() = default;
 
     virtual std::optional<ev::Event> poll() const = 0;
+    virtual WindowSize size() const = 0;
 };
 
 } // namespace rr

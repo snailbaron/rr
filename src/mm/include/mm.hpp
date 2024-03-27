@@ -2,6 +2,10 @@
 
 #include <filesystem>
 
+#ifdef _WIN32
+    #include <Windows.h>
+#endif
+
 namespace rr {
 
 class MemoryMap {
@@ -22,9 +26,14 @@ public:
     void* addr() const;
     size_t size() const;
 
+    friend void swap(MemoryMap& x, MemoryMap& y) noexcept;
+
 private:
     void* _addr = nullptr;
     size_t _len = 0;
+#if defined(_WIN32)
+    HANDLE _mappingHandle = INVALID_HANDLE_VALUE;
+#endif
 };
 
 } // namespace rr

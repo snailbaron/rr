@@ -105,8 +105,8 @@ public:
                 return output << "VK_OPERATION_DEFERRED_KHR";
             case VK_OPERATION_NOT_DEFERRED_KHR:
                 return output << "VK_OPERATION_NOT_DEFERRED_KHR";
-            case VK_ERROR_INVALID_VIDEO_STD_PARAMETERS_KHR:
-                return output << "VK_ERROR_INVALID_VIDEO_STD_PARAMETERS_KHR";
+            //case VK_ERROR_INVALID_VIDEO_STD_PARAMETERS_KHR:
+            //    return output << "VK_ERROR_INVALID_VIDEO_STD_PARAMETERS_KHR";
             case VK_ERROR_COMPRESSION_EXHAUSTED_EXT:
                 return output << "VK_ERROR_COMPRESSION_EXHAUSTED_EXT";
             case VK_ERROR_INCOMPATIBLE_SHADER_BINARY_EXT:

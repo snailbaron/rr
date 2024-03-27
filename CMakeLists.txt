@@ -6,12 +6,21 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
 find_package(X11 REQUIRED)
-find_package(Vulkan)
+find_package(Vulkan REQUIRED)
 
 add_compile_definitions(
     VK_NO_PROTOTYPES
-    VK_USE_PLATFORM_XCB_KHR
 )
+
+if(WIN32)
+    add_compile_definitions(
+        VK_USE_PLATFORM_WIN32_KHR
+    )
+elseif(UNIX)
+    add_compile_definitions(
+        VK_USE_PLATFORM_XCB_KHR
+    )
+endif()
 
 if(MSVC)
     add_compile_options(/W4 /WX)
