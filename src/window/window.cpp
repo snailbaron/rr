@@ -13,7 +13,7 @@ namespace rr {
 std::unique_ptr<Window> Window::create(Api api, const WindowOptions& options)
 {
     switch (api) {
-#if defined(__linux)
+#if defined(__linux__)
         case Api::XCB:
             return std::make_unique<XcbWindow>(options);
 #elif defined(_WIN32)

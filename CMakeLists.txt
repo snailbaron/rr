@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 
 project(rr)
 
+set(CMAKE_COLOR_DIAGNOSTICS ON)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
@@ -28,5 +29,9 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()
 
+add_compile_definitions(
+    VULKAN_HPP_NO_CONSTRUCTORS
+    VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1
+)
 add_subdirectory(src)
 add_subdirectory(example)

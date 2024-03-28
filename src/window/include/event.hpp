@@ -2,8 +2,6 @@
 
 #include <keys.hpp>
 
-//#include <xcb/xcb.h>
-
 #include <variant>
 
 namespace rr::ev {

@@ -36,10 +36,11 @@ public:
 private:
     void* loadInternalProcAddress(const char* name) const;
 
-#if defined(_WIN32)
+#if defined(__linux__)
+    void* _library = nullptr;
+#elif defined(_WIN32)
     HINSTANCE _instance = NULL;
 #endif
 };
-
 
 } // namespace rr

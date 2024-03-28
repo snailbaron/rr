@@ -29,12 +29,10 @@ class XcbWindow : public Window {
 public:
     XcbWindow(const WindowOptions& options);
 
-    xcb_connection_t* connection() const;
-    xcb_window_t window() const;
-
-    WindowSize size() const;
-
-    virtual std::optional<ev::Event> poll() const override;
+    WindowSize size() const override;
+    std::optional<ev::Event> poll() const override;
+    vk::raii::SurfaceKHR createVulkanSurface(
+        const vk::raii::Instance& instance) const override;
 
 private:
     XcbConnection _connection;

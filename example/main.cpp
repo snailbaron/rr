@@ -3,27 +3,19 @@
 #include <error.hpp>
 #include <li.hpp>
 #include <mm.hpp>
-//#include <xcb_window.hpp>
-#include <windows_window.hpp>
+#include <xcb_window.hpp>
+//#include <windows_window.hpp>
 
-#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_raii.hpp>
 //#include <vulkan/vulkan_xcb.h>
-
-//#include <dlfcn.h>
 
 #include <algorithm>
 #include <array>
-#include <chrono>
-#include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <optional>
-#include <thread>
 
 using namespace std::chrono_literals;
-using rr::Error;
-
-PFN_vkDebugUtilsMessengerCallbackEXT t;
 
 VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT severity,
@@ -103,12 +95,14 @@ private:
     const T& _value;
 };
 
-
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 int main()
 {
-    auto vulkanLibrary = rr::DynamicLibrary{"vulkan-1.dll"};
+    auto vulkanContext = vk::raii::Context{};
+
+    auto vulkanLibrary = rr::DynamicLibrary{"libvulkan.so"};
+    //auto vulkanLibrary = rr::DynamicLibrary{"vulkan-1.dll"};
 
     auto dynamicGetProcAddr =
         vulkanLibrary.getProcAddress<PFN_vkGetInstanceProcAddr>(
@@ -122,8 +116,11 @@ int main()
         .h = 500,
         .borderWidth = 10,
     };
-    //auto window = rr::XcbWindow{windowOptions};
-    auto window = rr::WindowsWindow{windowOptions};
+#if defined(__linux__)
+    auto window = rr::Window::create(rr::Api::XCB, windowOptions);
+#elif defined(_WIN32)
+    auto window = rr::Window::create(rr::Api::Win32, windowOptions);
+#endif
 
     auto layerProperties = vk::enumerateInstanceLayerProperties();
     std::cout << "layers:\n";
@@ -145,8 +142,8 @@ int main()
     auto enabledExtensionNames = std::vector<const char*> {
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
         "VK_KHR_surface",
-        //"VK_KHR_xcb_surface",
-        "VK_KHR_win32_surface",
+        "VK_KHR_xcb_surface",
+        //"VK_KHR_win32_surface",
     };
     auto applicationInfo = vk::ApplicationInfo{
         .pNext = nullptr,
@@ -165,8 +162,8 @@ int main()
         .enabledExtensionCount = (uint32_t)enabledExtensionNames.size(),
         .ppEnabledExtensionNames = enabledExtensionNames.data(),
     };
-    vk::Instance instance = vk::createInstance(instanceCreateInfo);
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
+    auto instance = vk::raii::Instance{vulkanContext, instanceCreateInfo};
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(*instance);
 
     auto messengerCreateInfo = vk::DebugUtilsMessengerCreateInfoEXT{
         .pNext = nullptr,
@@ -184,30 +181,24 @@ int main()
         .pfnUserCallback = debugCallback,
         .pUserData = nullptr,
     };
-    vk::DebugUtilsMessengerEXT debugMessenger =
+    vk::raii::DebugUtilsMessengerEXT debugMessenger =
         instance.createDebugUtilsMessengerEXT(messengerCreateInfo);
 
-    //auto xcbSurfaceCreateInfo = vk::XcbSurfaceCreateInfoKHR{
+    auto surface = window->createVulkanSurface(instance);
+    //auto win32SurfaceCreateInfo = vk::Win32SurfaceCreateInfoKHR{
     //    .pNext = nullptr,
-    //    .flags = 0,
-    //    .connection = window.connection(),
-    //    .window = window.window(),
+    //    .flags = vk::Win32SurfaceCreateFlagsKHR{},
+    //    .hinstance = window.hinstance(),
+    //    .hwnd = window.hwnd(),
     //};
-    //auto surface = instance.createXcbSurfaceKHR(&xcbSurfaceCreateInfo, nullptr);
-    auto win32SurfaceCreateInfo = vk::Win32SurfaceCreateInfoKHR{
-        .pNext = nullptr,
-        .flags = vk::Win32SurfaceCreateFlagsKHR{},
-        .hinstance = window.hinstance(),
-        .hwnd = window.hwnd(),
-    };
-    vk::SurfaceKHR surface = instance.createWin32SurfaceKHR(win32SurfaceCreateInfo);
+    //auto surface = instance.createWin32SurfaceKHR(win32SurfaceCreateInfo);
 
     auto deviceExtensionNames = std::vector<const char*>{
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     };
 
     auto physicalDevices = instance.enumeratePhysicalDevices();
-    auto selectedPhysicalDevice = vk::PhysicalDevice{};
+    auto selectedPhysicalDevice = vk::raii::PhysicalDevice{nullptr};
     auto selectedQueueFamilies = std::vector<uint32_t>{};
     auto availableSurfaceFormats = std::vector<vk::SurfaceFormatKHR>{};
     auto availablePresentModes = std::vector<vk::PresentModeKHR>{};
@@ -215,7 +206,7 @@ int main()
     uint32_t selectedGraphicsQueueFamily = 0;
     uint32_t selectedPresentQueueFamily = 0;
     std::cout << "physical devices:\n";
-    for (auto physicalDevice : physicalDevices) {
+    for (const auto& physicalDevice : physicalDevices) {
         auto dp = physicalDevice.getProperties();
         auto df = physicalDevice.getFeatures();
 
@@ -339,7 +330,7 @@ int main()
         .pEnabledFeatures = nullptr,
     };
     auto device = selectedPhysicalDevice.createDevice(deviceCreateInfo);
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(device);
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(*device);
 
     vk::SurfaceFormatKHR selectedSurfaceFormat = availableSurfaceFormats.front();
     for (const auto& format : availableSurfaceFormats) {
@@ -358,7 +349,7 @@ int main()
         }
     }
 
-    auto [windowWidth, windowHeight] = window.size();
+    auto [windowWidth, windowHeight] = window->size();
 
     uint32_t swapChainImageCount = availableSurfaceCapabilities.maxImageCount;
     if (swapChainImageCount == 0) {
@@ -394,13 +385,13 @@ int main()
         .clipped = vk::True,
         .oldSwapchain = VK_NULL_HANDLE,
     };
-    vk::SwapchainKHR swapchain = device.createSwapchainKHR(swapchainCreateInfo);
+    vk::raii::SwapchainKHR swapchain = device.createSwapchainKHR(swapchainCreateInfo);
 
-    auto swapchainImages = device.getSwapchainImagesKHR(swapchain);
+    auto swapchainImages = swapchain.getImages();
 
-    auto swapchainImageViews = std::vector<vk::ImageView>{};
+    auto swapchainImageViews = std::vector<vk::raii::ImageView>{};
     swapchainImageViews.reserve(swapchainImages.size());
-    for (const auto& image : swapchainImages) {
+    for (const vk::Image& image : swapchainImages) {
         auto imageViewCreateInfo = vk::ImageViewCreateInfo{
             .pNext = nullptr,
             .flags = vk::ImageViewCreateFlags{},
@@ -441,9 +432,9 @@ int main()
         .pCode = reinterpret_cast<uint32_t*>(fragShaderFile.addr()),
     };
 
-    vk::ShaderModule vertShaderModule =
+    vk::raii::ShaderModule vertShaderModule =
         device.createShaderModule(vertShaderInfo);
-    vk::ShaderModule fragShaderModule =
+    vk::raii::ShaderModule fragShaderModule =
         device.createShaderModule(fragShaderInfo);
 
     auto vertShaderStageCreateInfo = vk::PipelineShaderStageCreateInfo {
@@ -576,7 +567,7 @@ int main()
         .pushConstantRangeCount = 0,
         .pPushConstantRanges = nullptr,
     };
-    vk::PipelineLayout pipelineLayout =
+    vk::raii::PipelineLayout pipelineLayout =
         device.createPipelineLayout(pipelineLayoutInfo);
 
     auto colorAttachmentDescription = vk::AttachmentDescription{
@@ -628,7 +619,7 @@ int main()
         .dependencyCount = 1,
         .pDependencies = &subpassDependency,
     };
-    vk::RenderPass renderPass = device.createRenderPass(renderPassInfo);
+    vk::raii::RenderPass renderPass = device.createRenderPass(renderPassInfo);
 
     auto pipelineInfo = vk::GraphicsPipelineCreateInfo{
         .pNext = nullptr,
@@ -651,11 +642,10 @@ int main()
         .basePipelineIndex = -1,
     };
 
-    auto [result, pipelines] =
-        device.createGraphicsPipelines(VK_NULL_HANDLE, pipelineInfo);
-    vk::Pipeline graphicsPipeline = pipelines.front();
+    auto graphicsPipeline =
+        device.createGraphicsPipeline(VK_NULL_HANDLE, pipelineInfo);
 
-    auto swapchainFramebuffers = std::vector<vk::Framebuffer>{};
+    auto swapchainFramebuffers = std::vector<vk::raii::Framebuffer>{};
     swapchainFramebuffers.reserve(swapchainImageViews.size());
     for (const auto& swapchainImageView : swapchainImageViews) {
         auto framebufferInfo = vk::FramebufferCreateInfo{
@@ -663,7 +653,7 @@ int main()
             .flags = vk::FramebufferCreateFlags{},
             .renderPass = renderPass,
             .attachmentCount = 1,
-            .pAttachments = &swapchainImageView,
+            .pAttachments = &*swapchainImageView,
             .width = swapchainExtent.width,
             .height = swapchainExtent.height,
             .layers = 1,
@@ -677,7 +667,7 @@ int main()
         .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
         .queueFamilyIndex = selectedGraphicsQueueFamily,
     };
-    vk::CommandPool commandPool = device.createCommandPool(commandPoolInfo);
+    vk::raii::CommandPool commandPool = device.createCommandPool(commandPoolInfo);
 
     auto commandBufferInfo = vk::CommandBufferAllocateInfo{
         .pNext = nullptr,
@@ -692,20 +682,20 @@ int main()
         .pNext = nullptr,
         .flags = vk::SemaphoreCreateFlags{},
     };
-    vk::Semaphore imageAvailableSemaphore =
+    vk::raii::Semaphore imageAvailableSemaphore =
         device.createSemaphore(semaphoreInfo);
-    vk::Semaphore renderFinishedSemaphore =
+    vk::raii::Semaphore renderFinishedSemaphore =
         device.createSemaphore(semaphoreInfo);
 
     auto fenceInfo = vk::FenceCreateInfo{
         .pNext = nullptr,
         .flags = vk::FenceCreateFlagBits::eSignaled,
     };
-    vk::Fence inFlightFence = device.createFence(fenceInfo);
+    vk::raii::Fence inFlightFence = device.createFence(fenceInfo);
 
     for (;;) {
         bool done = false;
-        while (auto e = window.poll()) {
+        while (auto e = window->poll()) {
             if (e->closeWindow()) {
                 done = true;
                 break;
@@ -715,11 +705,11 @@ int main()
             break;
         }
 
-        (void)device.waitForFences(1, &inFlightFence, vk::True, UINT64_MAX);
-        (void)device.resetFences(1, &inFlightFence);
+        (void)device.waitForFences(*inFlightFence, vk::True, UINT64_MAX);
+        (void)device.resetFences(*inFlightFence);
 
-        auto [acquireImageResult, imageIndex] = device.acquireNextImageKHR(
-            swapchain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE);
+        auto [acquireImageResult, imageIndex] = swapchain.acquireNextImage(
+            UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE);
 
         commandBuffer.reset();
 
@@ -779,21 +769,21 @@ int main()
         auto submitInfo = vk::SubmitInfo{
             .pNext = nullptr,
             .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &imageAvailableSemaphore,
+            .pWaitSemaphores = &*imageAvailableSemaphore,
             .pWaitDstStageMask = waitStages,
             .commandBufferCount = 1,
             .pCommandBuffers = &commandBuffer,
             .signalSemaphoreCount = 1,
-            .pSignalSemaphores = &renderFinishedSemaphore,
+            .pSignalSemaphores = &*renderFinishedSemaphore,
         };
         graphicsQueue.submit(submitInfo, inFlightFence);
 
         auto presentInfo = vk::PresentInfoKHR{
             .pNext = nullptr,
             .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &renderFinishedSemaphore,
+            .pWaitSemaphores = &*renderFinishedSemaphore,
             .swapchainCount = 1,
-            .pSwapchains = &swapchain,
+            .pSwapchains = &*swapchain,
             .pImageIndices = &imageIndex,
             .pResults = nullptr,
         };
@@ -803,30 +793,4 @@ int main()
     }
 
     device.waitIdle();
-
-    device.destroySemaphore(imageAvailableSemaphore);
-    device.destroySemaphore(renderFinishedSemaphore);
-    device.destroyFence(inFlightFence);
-
-    device.destroyCommandPool(commandPool);
-
-    for (auto framebuffer : swapchainFramebuffers) {
-        device.destroyFramebuffer(framebuffer);
-    }
-
-    device.destroyPipeline(graphicsPipeline);
-
-    device.destroyRenderPass(renderPass);
-    device.destroyPipelineLayout(pipelineLayout);
-
-    device.destroyShaderModule(fragShaderModule);
-    device.destroyShaderModule(vertShaderModule);
-
-    for (const auto& imageView : swapchainImageViews) {
-        device.destroyImageView(imageView);
-    }
-    device.destroySwapchainKHR(swapchain);
-
-    instance.destroyDebugUtilsMessengerEXT(debugMessenger);
-    instance.destroySurfaceKHR(surface);
 }

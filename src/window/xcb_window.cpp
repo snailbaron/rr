@@ -126,16 +126,6 @@ XcbWindow::XcbWindow(const WindowOptions& options)
     xcb_flush(_connection.ptr());
 }
 
-xcb_connection_t* XcbWindow::connection() const
-{
-    return _connection.ptr();
-}
-
-xcb_window_t XcbWindow::window() const
-{
-    return _window;
-}
-
 WindowSize XcbWindow::size() const
 {
     auto cookie = xcb_get_geometry(_connection.ptr(), _window);
@@ -180,6 +170,18 @@ std::optional<ev::Event> XcbWindow::poll() const
     }
 
     return std::nullopt;
+}
+
+vk::raii::SurfaceKHR XcbWindow::createVulkanSurface(
+    const vk::raii::Instance& instance) const
+{
+    auto xcbSurfaceCreateInfo = vk::XcbSurfaceCreateInfoKHR{
+        .pNext = nullptr,
+        .flags = vk::XcbSurfaceCreateFlagsKHR{},
+        .connection = _connection.ptr(),
+        .window = _window,
+    };
+    return instance.createXcbSurfaceKHR(xcbSurfaceCreateInfo);
 }
 
 } // namespace rr
